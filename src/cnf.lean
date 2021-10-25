@@ -53,6 +53,29 @@ lemma not_satisfied_and_satisfied_inverse (ι : interpretation α) (l m : litera
 
 end literal
 
+namespace interpretation
+variable [decidable_eq α]
+
+def flip (ι : interpretation α) : literal α → interpretation α
+| (literal.pos x) := function.update ι x (!ι x)
+| (literal.neg x) := function.update ι x (!ι x)
+
+@[simp]
+lemma satisfied_flip_eq (ι : interpretation α) (l : literal α) :
+  literal.satisfied (ι.flip l) l = !literal.satisfied ι l :=
+by cases l; simp only [flip, function.update_same, literal.satisfied]
+
+@[simp]
+lemma satisfied_flip_neq (ι : interpretation α) (l m : literal α) (h₁ : m ≠ l) (h₂ : m ≠ l.inverse) :
+  literal.satisfied (ι.flip l) m = literal.satisfied ι m :=
+begin
+  cases l; cases m;
+  simp only [flip, literal.satisfied, ne.def, not_false_iff, literal.inverse] at ⊢ h₁ h₂;
+  rw function.update_noteq h₁ <|> rw function.update_noteq h₂
+end
+
+end interpretation
+
 namespace clause
 
 def satisfied (ι : interpretation α) (c : clause α) : bool :=
@@ -93,6 +116,10 @@ begin
       clause.satisfied_eq (λ l hl, h _ (list.mem_cons_self _ _) _ hl), ←satisfied, ←satisfied,
       ih (λ δ hδ l hl, h _ (list.mem_cons_of_mem _ hδ) _ hl)] }
 end
+
+lemma satisfied_iff' (ι κ : interpretation α) {c : cnf α} (h : ∀ γ ∈ c, ∀ l ∈ γ, literal.satisfied ι l = literal.satisfied κ l) :
+  c.satisfied ι ↔ c.satisfied κ :=
+by rw satisfied_eq _ _ h
 
 lemma satisfied_iff (ι : interpretation α) (c : cnf α) : satisfied ι c ↔ ∀ γ ∈ c, clause.satisfied ι γ :=
 by rw [satisfied, list.all_iff_forall]

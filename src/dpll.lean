@@ -195,13 +195,13 @@ lemma mem_unit_propagate (l : literal α) (c : cnf α) (γ : clause α) :
   γ ∈ unit_propagate l c ↔ ∃ δ, (δ ∈ c ∧ l ∉ δ) ∧ clause.unit_propagate l δ = γ :=
 by simp only [unit_propagate, clause.unit_propagate'_eq_some, and.assoc, list.mem_filter_map]
 
-lemma non_mem_unit_propagate (l : literal α) (c : cnf α) (γ : clause α) (hγ : γ ∈ unit_propagate l c) : l ∉ γ :=
+lemma non_mem_unit_propagate {l : literal α} {c : cnf α} {γ : clause α} (hγ : γ ∈ unit_propagate l c) : l ∉ γ :=
 begin
   obtain ⟨δ, ⟨⟨hδc, hlδ⟩, rfl⟩⟩ := (mem_unit_propagate l c γ).1 hγ,
   exact λ hl, hlδ (clause.mem_unit_propagate.1 hl).1
 end
 
-lemma inverse_non_mem_unit_propagate (l : literal α) (c : cnf α) (γ : clause α) (hγ : γ ∈ unit_propagate l c) :
+lemma inverse_non_mem_unit_propagate {l : literal α} {c : cnf α} {γ : clause α} (hγ : γ ∈ unit_propagate l c) :
   l.inverse ∉ γ :=
 begin
   obtain ⟨δ, ⟨⟨hδc, hlδ⟩, rfl⟩⟩ := (mem_unit_propagate l c γ).1 hγ,
@@ -231,37 +231,12 @@ lemma satisfiable_of_satisfiable_unit_propagate {l : literal α} {c : cnf α} (h
 begin
   rcases h with ⟨ι, hι⟩,
   by_cases h : literal.satisfied ι l = tt,
-  { refine ⟨ι, _⟩,
-    rw ←satisfied_unit_propagate _ h,
-    exact hι },
-  { refine ⟨function.update ι l.var (!ι l.var), _⟩,
-    rw ←satisfied_unit_propagate l _,
-    { rw satisfied_eq _ ι,
-      { exact hι },
-      { rintros γ hγ (m|m) hm,
-        { simp only [literal.satisfied],
-          suffices : m ≠ l.var,
-          { exact function.update_noteq this _ _ },
-          rintro rfl,
-          cases l,
-          { exact non_mem_unit_propagate _ _ _ hγ hm },
-          { exact inverse_non_mem_unit_propagate _ _ _ hγ hm } },
-        { simp only [literal.satisfied],
-          suffices : m ≠ l.var,
-          { congr' 1,
-            exact function.update_noteq this _ _ },
-          rintro rfl,
-          cases l,
-          { exact inverse_non_mem_unit_propagate _ _ _ hγ hm },
-          { exact non_mem_unit_propagate _ _ _ hγ hm } } } },
-    { cases l,
-      { simp only [eq_ff_eq_not_eq_tt, literal.var, literal.satisfied] at ⊢ h,
-        rw literal.var,
-        simpa only [eq_ff_eq_not_eq_tt, function.update_same, literal.bnot_iff_not] using h },
-      { simp only [bnot_eq_true_eq_eq_ff, eq_ff_eq_not_eq_tt, literal.var, eq_tt_eq_not_eq_ff, literal.satisfied,
-          literal.bnot_iff_not] at ⊢ h,
-        rw literal.var,
-        simpa only [bnot_eq_ff_eq_eq_tt, function.update_same] using h } } }
+  { exact ⟨ι, (satisfied_unit_propagate _ h).1 hι⟩ },
+  { refine ⟨ι.flip l, (satisfied_unit_propagate l _).1 ((satisfied_iff' _ ι (λ γ hγ m hm, _)).2 hι)⟩,
+    { simpa only [interpretation.satisfied_flip_eq, literal.bnot_iff_not] using h },
+    { apply interpretation.satisfied_flip_neq;
+      rintro rfl,
+      exacts [non_mem_unit_propagate hγ hm, inverse_non_mem_unit_propagate hγ hm] } }
 end
 
 def any_literal : Π (c : clause α) (hc : c ≠ []), literal α
