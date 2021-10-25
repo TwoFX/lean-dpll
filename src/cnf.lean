@@ -14,7 +14,7 @@ inductive literal : Type u
 
 abbreviation clause : Type u := list (literal α)
 abbreviation cnf : Type u := list (clause α)
-abbreviation interpretation : Type u := α → bool
+abbreviation interpretation : Type u := α → Prop
 
 end
 
@@ -31,21 +31,17 @@ def var : literal α → α
 | (neg x) := x
 
 @[simp]
-def satisfied (ι : interpretation α) : literal α → bool
+def satisfied (ι : interpretation α) : literal α → Prop
 | (pos x) := ι x
-| (neg x) := bnot (ι x)
+| (neg x) := ¬ι x
 
 @[simp]
-lemma satisfied_inverse (ι : interpretation α) (l : literal α) : satisfied ι l.inverse = bnot (satisfied ι l) :=
+lemma satisfied_inverse (ι : interpretation α) (l : literal α) : satisfied ι l.inverse ↔ ¬satisfied ι l :=
 by cases l; simp
 
 @[simp]
 lemma inverse_inverse (l : literal α) : l.inverse.inverse = l :=
 by cases l; refl
-
-@[simp]
-lemma bnot_iff_not (b : bool) : !b ↔ ¬b :=
-by { unfold_coes, simp only [bnot_eq_true_eq_eq_ff, eq_ff_eq_not_eq_tt] }
 
 lemma not_satisfied_and_satisfied_inverse (ι : interpretation α) (l m : literal α)
   (hl : satisfied ι l) (hm : satisfied ι m) : l ≠ m.inverse :=
@@ -57,17 +53,16 @@ namespace interpretation
 variable [decidable_eq α]
 
 def flip (ι : interpretation α) : literal α → interpretation α
-| (literal.pos x) := function.update ι x (!ι x)
-| (literal.neg x) := function.update ι x (!ι x)
+| (literal.pos x) := function.update ι x ¬ι x
+| (literal.neg x) := function.update ι x ¬ι x
 
 @[simp]
 lemma satisfied_flip_eq (ι : interpretation α) (l : literal α) :
-  literal.satisfied (ι.flip l) l = !literal.satisfied ι l :=
+  literal.satisfied (ι.flip l) l ↔ ¬literal.satisfied ι l :=
 by cases l; simp only [flip, function.update_same, literal.satisfied]
 
-@[simp]
 lemma satisfied_flip_neq (ι : interpretation α) (l m : literal α) (h₁ : m ≠ l) (h₂ : m ≠ l.inverse) :
-  literal.satisfied (ι.flip l) m = literal.satisfied ι m :=
+  literal.satisfied (ι.flip l) m ↔ literal.satisfied ι m :=
 begin
   cases l; cases m;
   simp only [flip, literal.satisfied, ne.def, not_false_iff, literal.inverse] at ⊢ h₁ h₂;
@@ -78,68 +73,60 @@ end interpretation
 
 namespace clause
 
-def satisfied (ι : interpretation α) (c : clause α) : bool :=
-c.any (literal.satisfied ι)
+def satisfied (ι : interpretation α) (γ : clause α) : Prop :=
+∃ l ∈ γ, literal.satisfied ι l
 
-lemma satisfied_eq {ι κ : interpretation α} {c : clause α} (h : ∀ l ∈ c, literal.satisfied ι l = literal.satisfied κ l) :
-  c.satisfied ι = c.satisfied κ :=
+@[simp]
+lemma not_satisfied_nil (ι : interpretation α) : ¬satisfied ι [] :=
+λ ⟨_, ⟨hl, _⟩⟩, list.not_mem_nil _ hl
+
+@[simp]
+lemma satisfied_cons (ι : interpretation α) (γ : clause α) (l : literal α) :
+  satisfied ι (l::γ) ↔ literal.satisfied ι l ∨ satisfied ι γ :=
+by simp only [satisfied, list.exists_mem_cons_iff]
+
+lemma satisfied_eq {ι κ : interpretation α} {γ : clause α} (h : ∀ l ∈ γ, literal.satisfied ι l ↔ literal.satisfied κ l) :
+  γ.satisfied ι ↔ γ.satisfied κ :=
 begin
-  induction c with l ls ih,
-  { refl },
-  { rw [satisfied, satisfied, list.any_cons, list.any_cons, h l (list.mem_cons_self _ _), ←satisfied, ←satisfied,
-      ih (λ m hm, h _ (list.mem_cons_of_mem _ hm))] }
+  induction γ with l γ ih,
+  { simp only [not_satisfied_nil] },
+  { simp only [satisfied_cons, h _ (list.mem_cons_self _ _), ih (λ m hm, h _ (list.mem_cons_of_mem _ hm))] }
 end
-
-lemma satisfied_iff (ι : interpretation α) (c : clause α) : satisfied ι c ↔ ∃ l ∈ c, literal.satisfied ι l :=
-by rw [satisfied, list.any_iff_exists]
-
-@[simp] 
-lemma not_satisfied_empty (ι : interpretation α) : satisfied ι [] = ff :=
-rfl
-
-lemma not_satisfied_empty' (ι : interpretation α) : ¬satisfied ι [] :=
-by simp
 
 end clause
 
 namespace cnf
 
-def satisfied (ι : interpretation α) (c : cnf α) : bool :=
-c.all (clause.satisfied ι)
+def satisfied (ι : interpretation α) (c : cnf α) : Prop :=
+∀ γ ∈ c, clause.satisfied ι γ
 
-lemma satisfied_eq (ι κ : interpretation α) {c : cnf α} (h : ∀ γ ∈ c, ∀ l ∈ γ, literal.satisfied ι l = literal.satisfied κ l) :
-  c.satisfied ι = c.satisfied κ :=
+@[simp]
+lemma satisfied_nil (ι : interpretation α) : satisfied ι [] :=
+λ γ hγ, absurd hγ $ list.not_mem_nil _
+
+@[simp]
+lemma satisfied_cons (ι : interpretation α) (c : cnf  α) (γ : clause α) :
+  satisfied ι (γ::c) ↔ clause.satisfied ι γ ∧ satisfied ι c :=
+by simp only [satisfied, list.forall_mem_cons]
+
+lemma satisfied_iff (ι κ : interpretation α) {c : cnf α} (h : ∀ γ ∈ c, ∀ l ∈ γ, literal.satisfied ι l ↔ literal.satisfied κ l) :
+  c.satisfied ι ↔ c.satisfied κ :=
 begin
   induction c with γ c ih,
-  { refl },
-  { rw [satisfied, satisfied, list.all_cons, list.all_cons,
-      clause.satisfied_eq (λ l hl, h _ (list.mem_cons_self _ _) _ hl), ←satisfied, ←satisfied,
+  { simp only [satisfied_nil] },
+  { simp only [satisfied_cons, clause.satisfied_eq (λ l hl, h _ (list.mem_cons_self _ _) _ hl),
       ih (λ δ hδ l hl, h _ (list.mem_cons_of_mem _ hδ) _ hl)] }
 end
-
-lemma satisfied_iff' (ι κ : interpretation α) {c : cnf α} (h : ∀ γ ∈ c, ∀ l ∈ γ, literal.satisfied ι l = literal.satisfied κ l) :
-  c.satisfied ι ↔ c.satisfied κ :=
-by rw satisfied_eq _ _ h
-
-lemma satisfied_iff (ι : interpretation α) (c : cnf α) : satisfied ι c ↔ ∀ γ ∈ c, clause.satisfied ι γ :=
-by rw [satisfied, list.all_iff_forall]
 
 def satisfiable (c : cnf α) : Prop :=
 ∃ ι, satisfied ι c
 
 @[simp]
 lemma satisfiable_empty : satisfiable ([] : cnf α) :=
-⟨λ x, false, dec_trivial⟩
+⟨λ x, false, satisfied_nil _⟩
 
 lemma not_satisfiable_of_empty_mem {c : cnf α} (hc : [] ∈ c) : ¬satisfiable c :=
-begin
-  rw satisfiable,
-  rintro ⟨ι, hι⟩,
-  rw satisfied_iff at hι,
-  exact clause.not_satisfied_empty' ι (hι _ hc)
-end
-
-#print axioms not_satisfiable_of_empty_mem
+λ ⟨ι, hι⟩, clause.not_satisfied_nil _ (hι _ hc)
 
 def size (c : cnf α) : ℕ :=
 (c.map list.length).sum

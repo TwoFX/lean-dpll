@@ -1,6 +1,6 @@
 import tactic cnf
 
-universe u
+universes u v
 
 variables {α : Type u} [decidable_eq α]
 
@@ -25,7 +25,15 @@ begin
                                                ... < s.length + (t.length + 1) : add_lt_add_left (lt_add_one _) _ }
 end
 
-lemma sum_map_le_sum_map {l : list α} {f g : α → ℕ} (hfg : ∀ x ∈ l, f x ≤ g x) : (l.map f).sum ≤ (l.map g).sum :=
+variables {β : Type v} [add_monoid β] [partial_order β] 
+variables [contravariant_class β β (+) (<)]
+variables [covariant_class β β (+) (<)]
+variables [covariant_class β β (function.swap (+)) (≤)]
+variables [covariant_class β β (function.swap (+)) (<)]
+variables [covariant_class β β (+) (≤)]
+variables [@decidable_rel β (≤)]
+
+lemma sum_map_le_sum_map {l : list α} {f g : α → β} (hfg : ∀ x ∈ l, f x ≤ g x) : (l.map f).sum ≤ (l.map g).sum :=
 begin
   induction l with x l ih,
   { refl },
@@ -33,12 +41,12 @@ begin
     exact add_le_add (hfg _ (mem_cons_self _ _)) (ih (λ x hx, hfg _ (mem_cons_of_mem _ hx))) }
 end
 
-lemma sum_map_lt_sum_map (l : list α) (f g : α → ℕ) (hfg : ∀ x ∈ l, f x ≤ g x) :
+lemma sum_map_lt_sum_map (l : list α) (f g : α → β) (hfg : ∀ x ∈ l, f x ≤ g x) :
   (l.map f).sum < (l.map g).sum ↔ ∃ x ∈ l, f x < g x :=
 begin
   refine ⟨_, _⟩,
   { induction l with a as ih,
-    { dec_trivial },
+    { simp only [lt_self_iff_false, forall_false_left, map_nil] },
     { by_cases h : f a < g a,
       { exact λ _, ⟨a, ⟨mem_cons_self _ _, h⟩⟩ },
       { have hfa : f a = g a := decidable.eq_iff_le_not_lt.2 ⟨hfg _ (mem_cons_self _ _), h⟩,
@@ -79,7 +87,7 @@ lemma unit_propagate'_eq_some (l : literal α) (c d : clause α) :
 by by_cases h : l ∈ c; simp [unit_propagate', h]
 
 @[simp]
-def satisfied' (ι : interpretation α) : option (clause α) → bool
+def satisfied' (ι : interpretation α) : option (clause α) → Prop
 | none := tt
 | (some c) := satisfied ι c
 
@@ -127,7 +135,7 @@ by rw [unit_propagate, list.mem_filter]
 lemma satisfied_unit_propagate (l : literal α) (c : clause α) (ι : interpretation α) (hl : literal.satisfied ι l) :
   satisfied ι (unit_propagate l c) ↔ satisfied ι c :=
 begin
-  simp only [satisfied_iff],
+  simp only [satisfied],
   refine ⟨_, _⟩,
   { rintro ⟨m, ⟨hmem, hm⟩⟩,
     rw [mem_unit_propagate] at hmem,
@@ -144,7 +152,7 @@ lemma satisfied'_unit_propagate' (l : literal α) (c : clause α) (ι : interpre
   satisfied' ι (unit_propagate' l c) ↔ satisfied ι c :=
 begin
   by_cases h : l ∈ c,
-  { rw [unit_propagate'_of_mem h, satisfied', satisfied_iff, coe_sort_tt, true_iff],
+  { rw [unit_propagate'_of_mem h, satisfied', satisfied, coe_sort_tt, true_iff],
     exact ⟨_, h, hl⟩ },
   { rw [unit_propagate'_of_not_mem h, satisfied', satisfied_unit_propagate],
     exact hl }
@@ -211,10 +219,10 @@ end
 lemma satisfied_unit_propagate (l : literal α) {c : cnf α} {ι : interpretation α} (hl : literal.satisfied ι l) :
   satisfied ι (unit_propagate l c) ↔ satisfied ι c :=
 begin
-  simp only [satisfied_iff],
+  simp only [satisfied],
   refine ⟨λ h γ hγ, _, λ h γ hγ, _⟩,
   { by_cases hlγ : l ∈ γ,
-    { rw clause.satisfied_iff,
+    { rw clause.satisfied,
       exact ⟨l, hlγ, hl⟩ },
     { rw ←clause.satisfied_unit_propagate l _ _ hl,
       apply h,
@@ -230,10 +238,10 @@ lemma satisfiable_of_satisfiable_unit_propagate {l : literal α} {c : cnf α} (h
   satisfiable c :=
 begin
   rcases h with ⟨ι, hι⟩,
-  by_cases h : literal.satisfied ι l = tt,
+  by_cases h : literal.satisfied ι l,
   { exact ⟨ι, (satisfied_unit_propagate _ h).1 hι⟩ },
-  { refine ⟨ι.flip l, (satisfied_unit_propagate l _).1 ((satisfied_iff' _ ι (λ γ hγ m hm, _)).2 hι)⟩,
-    { simpa only [interpretation.satisfied_flip_eq, literal.bnot_iff_not] using h },
+  { refine ⟨ι.flip l, (satisfied_unit_propagate l _).1 ((satisfied_iff _ ι (λ γ hγ m hm, _)).2 hι)⟩,
+    { simpa only [interpretation.satisfied_flip_eq] using h },
     { apply interpretation.satisfied_flip_neq;
       rintro rfl,
       exacts [non_mem_unit_propagate hγ hm, inverse_non_mem_unit_propagate hγ hm] } }
@@ -246,8 +254,6 @@ def any_literal : Π (c : clause α) (hc : c ≠ []), literal α
 lemma any_literal_mem : ∀ {c : clause α} (hc : c ≠ []), any_literal c hc ∈ c
 | [] hc := false.elim (hc rfl)
 | (l::lc) hc := list.mem_cons_self _ _
-
-#check has_well_founded_of_has_sizeof
 
 def dpll : cnf α → bool
 | [] := tt
@@ -277,13 +283,11 @@ theorem dpll_correct : ∀ (c : cnf α), dpll c ↔ satisfiable c
         { apply satisfiable_of_satisfiable_unit_propagate hr },
         { apply satisfiable_of_satisfiable_unit_propagate hr } },
       { rintro ⟨ι, hι⟩,
-        by_cases hlι : literal.satisfied ι (any_literal x hx) = tt,
+        by_cases hlι : literal.satisfied ι (any_literal x hx),
         { exact or.inl ⟨ι, (satisfied_unit_propagate _ hlι).2 hι⟩ },
         { refine or.inr ⟨ι, (satisfied_unit_propagate _ _).2 hι⟩,
-          simpa only [literal.satisfied_inverse, literal.bnot_iff_not] using hlι } }
+          simpa only [literal.satisfied_inverse] using hlι } }
     end
-
-#print axioms dpll_correct
 
 section
 open literal
