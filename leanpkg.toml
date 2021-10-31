@@ -1,8 +1,8 @@
 [package]
 name = "merlean"
 version = "0.1"
-lean_version = "leanprover-community/lean:3.33.0"
+lean_version = "leanprover-community/lean:3.35.0"
 path = "src"
 
 [dependencies]
-mathlib = {git = "https://github.com/leanprover-community/mathlib", rev = "150bbeab00b754a3e42e936696673ace6360c231"}
+mathlib = {git = "https://github.com/leanprover-community/mathlib", rev = "4ef3fcd231c33a11b1011f63ce81ef8058aa3562"}
