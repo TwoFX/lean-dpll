@@ -14,7 +14,7 @@ inductive literal : Type u
 
 abbreviation clause : Type u := list (literal α)
 abbreviation cnf : Type u := list (clause α)
-abbreviation interpretation : Type u := α → Prop
+abbreviation interpretation : Type u := α → bool
 
 end
 
@@ -35,6 +35,9 @@ def satisfied (ι : interpretation α) : literal α → Prop
 | (pos x) := ι x
 | (neg x) := ¬ι x
 
+instance decidable_satisfied (ι : interpretation α) : decidable_pred (satisfied ι) :=
+λ l, by cases l; dsimp only [satisfied]; apply_instance
+
 @[simp]
 lemma satisfied_inverse (ι : interpretation α) (l : literal α) : satisfied ι l.inverse ↔ ¬satisfied ι l :=
 by cases l; simp
@@ -45,7 +48,7 @@ by cases l; refl
 
 lemma not_satisfied_and_satisfied_inverse (ι : interpretation α) (l m : literal α)
   (hl : satisfied ι l) (hm : satisfied ι m) : l ≠ m.inverse :=
-λ h, absurd hl $ by { convert hm, simp [h] }
+λ h, absurd hl $ by { convert hm, rw [←satisfied_inverse, h, inverse_inverse] }
 
 end literal
 
@@ -59,7 +62,7 @@ def flip (ι : interpretation α) : literal α → interpretation α
 @[simp]
 lemma satisfied_flip_eq (ι : interpretation α) (l : literal α) :
   literal.satisfied (ι.flip l) l ↔ ¬literal.satisfied ι l :=
-by cases l; simp only [flip, function.update_same, literal.satisfied]
+by cases l; simp only [flip, function.update_same, literal.satisfied, bool.of_to_bool_iff]
 
 lemma satisfied_flip_neq (ι : interpretation α) (l m : literal α) (h₁ : m ≠ l) (h₂ : m ≠ l.inverse) :
   literal.satisfied (ι.flip l) m ↔ literal.satisfied ι m :=

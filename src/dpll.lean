@@ -132,8 +132,8 @@ lemma mem_unit_propagate {l : literal α} {c : clause α} {m : literal α} :
   m ∈ unit_propagate l c ↔ m ∈ c ∧ l.inverse ≠ m :=
 by rw [unit_propagate, list.mem_filter]
 
-lemma satisfied_unit_propagate (l : literal α) (c : clause α) (ι : interpretation α) (hl : literal.satisfied ι l) :
-  satisfied ι (unit_propagate l c) ↔ satisfied ι c :=
+lemma satisfied_unit_propagate (l : literal α) (c : clause α) (ι : interpretation α)
+  (hl : literal.satisfied ι l) : satisfied ι (unit_propagate l c) ↔ satisfied ι c :=
 begin
   simp only [satisfied],
   refine ⟨_, _⟩,
@@ -148,8 +148,8 @@ begin
       apply literal.not_satisfied_and_satisfied_inverse _ _ _ hm hl } }
 end
 
-lemma satisfied'_unit_propagate' (l : literal α) (c : clause α) (ι : interpretation α) (hl : literal.satisfied ι l) :
-  satisfied' ι (unit_propagate' l c) ↔ satisfied ι c :=
+lemma satisfied'_unit_propagate' (l : literal α) (c : clause α) (ι : interpretation α)
+  (hl : literal.satisfied ι l) : satisfied' ι (unit_propagate' l c) ↔ satisfied ι c :=
 begin
   by_cases h : l ∈ c,
   { rw [unit_propagate'_of_mem h, satisfied', satisfied, coe_sort_tt, true_iff],
@@ -216,8 +216,8 @@ begin
   exact λ hl, (clause.mem_unit_propagate.1 hl).2 rfl
 end
 
-lemma satisfied_unit_propagate (l : literal α) {c : cnf α} {ι : interpretation α} (hl : literal.satisfied ι l) :
-  satisfied ι (unit_propagate l c) ↔ satisfied ι c :=
+lemma satisfied_unit_propagate (l : literal α) {c : cnf α} {ι : interpretation α}
+  (hl : literal.satisfied ι l) : satisfied ι (unit_propagate l c) ↔ satisfied ι c :=
 begin
   simp only [satisfied],
   refine ⟨λ h γ hγ, _, λ h γ hγ, _⟩,
