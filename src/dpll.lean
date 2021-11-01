@@ -11,25 +11,6 @@ variables {α : Type u} [decidable_eq α]
 
 namespace list
 
-lemma count_lt_iff_exists (l : list α) (P : α → Prop) [decidable_pred P] : (l.filter P).length < l.length ↔ ∃ x ∈ l, ¬P x :=
-begin
-  refine ⟨_, _⟩,
-  { induction l with a as ih,
-    { dec_trivial },
-    { by_cases h : P a,
-      { rw [list.length_cons, list.filter_cons_of_pos _ h, list.length_cons, add_lt_add_iff_right],
-        intro h',
-        obtain ⟨x, ⟨hx, hx'⟩⟩ := ih h',
-        exact ⟨x, ⟨mem_cons_of_mem a hx, hx'⟩⟩ },
-      { exact λ _, ⟨a, ⟨mem_cons_self _ _, h⟩⟩ } } },
-  { rintro ⟨x, ⟨hx, hx'⟩⟩,
-    obtain ⟨s, t, h⟩ := list.mem_split hx,
-    subst h,
-    simp only [filter_append, length, length_append, filter_cons_of_neg _ hx'],
-    calc (filter P s).length + (filter P t).length ≤ s.length + t.length : add_le_add (length_le_of_sublist (filter_sublist _)) (length_le_of_sublist (filter_sublist _))
-                                               ... < s.length + (t.length + 1) : add_lt_add_left (lt_add_one _) _ }
-end
-
 variables {β : Type v} [add_monoid β] [partial_order β] 
 variables [contravariant_class β β (+) (<)]
 variables [covariant_class β β (+) (<)]
@@ -104,11 +85,9 @@ def length' : option (clause α) → ℕ
 lemma length'_comp_some : (length' : option (clause α) → ℕ) ∘ some = list.length :=
 rfl
 
-lemma length_unit_propagate {l : literal α} {c : clause α} (hl : l.inverse ∈ c) : (unit_propagate l c).length < c.length :=
-begin
-  rw [unit_propagate, list.count_lt_iff_exists],
-  exact ⟨_, hl, λ h, h rfl⟩
-end
+lemma length_unit_propagate {l : literal α} {c : clause α} (hl : l.inverse ∈ c) :
+  (unit_propagate l c).length < c.length :=
+(list.length_filter_lt_length_iff_exists _ _).2 ⟨_, hl, λ h, h rfl⟩
 
 lemma length'_unit_propagate'_of_mem {l : literal α} {c : clause α} (hl : l ∈ c) : length' (unit_propagate' l c) < c.length :=
 by simpa only [unit_propagate'_of_mem hl, length'] using list.length_pos_of_mem hl
